@@ -8,5 +8,6 @@ type IMiddlware interface {
 
 type IAuthMiddleware interface {
 	IMiddlware
-	CheckAuth(any) (bool, error)
+	CheckAuth(string) (bool, error)
+	extractAuth(http.Header) (string, error)
 }
