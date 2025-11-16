@@ -28,7 +28,25 @@ func (r *Router) GetRouteHandler() (http.Handler, error) {
 		Methods(http.MethodPost).
 		HandlerFunc(r.contoller.HandleHealthCheck)
 
-	router.Use(r.auth.CheckAuth)
+	router.
+		Path(schoolsPath).
+		Name(schoolsPathName).
+		Methods(http.MethodPost).
+		HandlerFunc(r.contoller.HandleGetSchools)
+
+	router.
+		Path(statsPath).
+		Name(statsPathName).
+		Methods(http.MethodPost).
+		HandlerFunc(r.contoller.HandleGetStats)
+
+	router.
+		Path(statsSummaryPath).
+		Name(statsSummaryPathName).
+		Methods(http.MethodPost).
+		HandlerFunc(r.contoller.HandleGetStatsSummary)
+
+	router.Use(r.auth.GetMiddleware())
 
 	return router, nil
 }

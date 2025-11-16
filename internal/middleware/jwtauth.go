@@ -1,9 +1,12 @@
 package middleware
 
 import (
+	"academic-api/internal/common"
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -27,15 +30,21 @@ func (mw *JwtMiddleware) GetMiddleware() func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			token, err := mw.extractAuth(req.Header)
 			if err != nil {
-				// TODO: write auth error response
+				logrus.WithError(err).Error("Failed to extract JWT.")
+				common.WriteForbiddenResponse(w, err)
+				return
 			}
 
 			tokenValid, err := mw.CheckAuth(token)
 			if err != nil {
-				// TODO: write error response
+				logrus.WithError(err).Error("Failed to parse JWT.")
+				common.WriteUnauthorizedResponse(w, err)
+				return
 			}
 			if !tokenValid {
-				// TODO : write invalid auth response
+				logrus.Error("Login attempted with invalidate JWT.")
+				common.WriteUnauthorizedResponse(w, err)
+				return
 			}
 
 			next.ServeHTTP(w, req)
