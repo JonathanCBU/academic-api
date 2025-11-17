@@ -10,14 +10,12 @@ type IService interface {
 	HealthCheck(reqBody io.ReadCloser) (map[string]any, error)
 	GetSchools(req model.GetSchoolsRequest) (*model.GetSchoolsResponse, error)
 	GetStats(req model.GetStatsRequest) (*model.GetStatsResponse, error)
-	GetStatsSummary(req model.GetStatsRequest) (*model.StatsSummary, error)
 }
 
 type IController interface {
 	HandleHealthCheck(w http.ResponseWriter, r *http.Request)
 	HandleGetSchools(w http.ResponseWriter, r *http.Request)
 	HandleGetStats(w http.ResponseWriter, r *http.Request)
-	HandleGetStatsSummary(w http.ResponseWriter, r *http.Request)
 }
 
 type IRouter interface {

@@ -50,13 +50,6 @@ func (c *Controller) HandleGetSchools(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	err := req.Validate()
-	if err != nil {
-		logrus.WithError(err).Error("Failed to validate schools request body.")
-		common.WriteBadRequestResponse(w, err)
-		return
-	}
-
 	// Call service
 	response, err := c.service.GetSchools(req)
 	if err != nil {
@@ -110,45 +103,6 @@ func (c *Controller) HandleGetStats(w http.ResponseWriter, r *http.Request) {
 	respBody := common.ResponseBody{
 		Message: "Statistics retrieved successfully",
 		Data:    response,
-	}
-
-	common.WriteOkResponse(w, respBody)
-}
-
-// HandleGetStatsSummary handles POST /stats/summary
-func (c *Controller) HandleGetStatsSummary(w http.ResponseWriter, r *http.Request) {
-	// Parse request body
-	var req model.GetStatsRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logrus.WithError(err).Error("Failed to decode request body")
-		common.WriteBadRequestResponse(w, fmt.Errorf("invalid request body: %w", err))
-		return
-	}
-	defer r.Body.Close()
-
-	// Validate inputs (same as GetStats)
-	if req.Year < 0 || req.Year > 2100 {
-		common.WriteBadRequestResponse(w, fmt.Errorf("year must be between 0 and 2100"))
-		return
-	}
-
-	if req.State != "" && len(req.State) != 2 {
-		common.WriteBadRequestResponse(w, fmt.Errorf("state code must be 2 characters"))
-		return
-	}
-
-	// Call service
-	summary, err := c.service.GetStatsSummary(req)
-	if err != nil {
-		logrus.WithError(err).Error("Failed to get stats summary")
-		common.WriteInternalErrorResponse(w, err)
-		return
-	}
-
-	// Return response
-	respBody := common.ResponseBody{
-		Message: "Statistics summary retrieved successfully",
-		Data:    summary,
 	}
 
 	common.WriteOkResponse(w, respBody)
