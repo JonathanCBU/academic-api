@@ -1,105 +1,109 @@
 package model
 
 import (
-	"database/sql"
 	"fmt"
+
+	"github.com/gocraft/dbr/v2"
 )
 
 // School represents a school entity
 type School struct {
-	SchoolID     int    `json:"school_id"`
-	SchoolName   string `json:"school_name"`
-	StateCode    string `json:"state_code"`
-	DistrictName string `json:"district_name"`
-	NCESID       string `json:"nces_id,omitempty"`
-	Address      string `json:"address,omitempty"`
-	CreatedAt    string `json:"created_at"`
-	UpdatedAt    string `json:"updated_at"`
+	Model
+	SchoolName   string `db:"school_name" json:"school_name"`
+	StateCode    string `db:"state_code" json:"state_code"`
+	DistrictName string `db:"district_name" json:"district_name"`
 }
 
-// GetSchoolsRequest represents the request body for listing schools
-type GetSchoolsRequest struct {
-	State string `json:"state"` // State abbreviation (e.g., "CA", "TX")
-}
-
-// GetSchoolsResponse represents the paginated response
-type GetSchoolsResponse struct {
-	Schools []School `json:"schools"`
-	Count   int      `json:"count"`
-}
-
-func (req *GetSchoolsRequest) Validate() error {
-	// State code format
-	if req.State != "" && len(req.State) != 2 {
-		return fmt.Errorf("Invalid state abbreviation.")
+func (s *School) Validate() error {
+	if s.SchoolName == "" {
+		return fmt.Errorf("school_name is required")
+	}
+	if s.StateCode == "" {
+		return fmt.Errorf("state_code is required")
+	}
+	if len(s.StateCode) != 2 {
+		return fmt.Errorf("state_code must be 2 characters")
 	}
 	return nil
 }
 
-// inherit
-func (req *GetSchoolsRequest) Query(db *sql.DB) (*GetSchoolsResponse, error) {
-	// Build query
-	query := `
-		SELECT 
-			school_id,
-			school_name,
-			state_code,
-			district_name,
-			COALESCE(nces_id, '') as nces_id,
-			COALESCE(address, '') as address,
-			created_at,
-			updated_at
-		FROM schools
-	`
-
-	var args []any
-	var whereClause string
-
-	// Add state filter if provided
-	if req.State != "" {
-		whereClause = " WHERE state_code = ?"
-		args = append(args, req.State)
-	}
-
-	// Add ORDER BY and LIMIT
-	query += whereClause + " ORDER BY school_id"
-
-	// Execute query
-	rows, err := db.Query(query, args...)
+func (s *School) Create(db *dbr.Tx) error {
+	err := s.Validate()
 	if err != nil {
-		return nil, fmt.Errorf("failed to query schools: %w", err)
+		return err
 	}
-	defer rows.Close()
 
-	// Scan results
+	err = db.InsertInto("schools").
+		Columns("school_name", "state_code", "district_name", "created_at").
+		Record(s).
+		Returning("id", "created_at").
+		Load(s) // Load the ID and created_at back into the struct
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// SchoolReader represents query parameters for filtering schools
+type SchoolReader struct {
+	State *string `json:"state"` // Nullable - use pointer
+}
+
+// Helper function for creating a SchoolReader with state filter
+func NewSchoolReaderWithState(state string) *SchoolReader {
+	return &SchoolReader{State: &state}
+}
+
+// Helper function for creating a SchoolReader with no filters
+func NewSchoolReader() *SchoolReader {
+	return &SchoolReader{State: nil}
+}
+
+func (r *SchoolReader) Validate() error {
+	// Only validate if State is provided
+	if r.State != nil && len(*r.State) != 2 {
+		return fmt.Errorf("invalid state abbreviation: must be 2 characters")
+	}
+	return nil
+}
+
+// Query retrieves schools based on filter criteria
+func (r *SchoolReader) Query(db *dbr.Tx) ([]IModel, error) {
 	var schools []School
-	for rows.Next() {
-		var school School
-		err := rows.Scan(
-			&school.SchoolID,
-			&school.SchoolName,
-			&school.StateCode,
-			&school.DistrictName,
-			&school.NCESID,
-			&school.Address,
-			&school.CreatedAt,
-			&school.UpdatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan school row: %w", err)
-		}
-		schools = append(schools, school)
+
+	query := db.Select("*").From("schools")
+
+	// Apply state filter if provided
+	if r.State != nil {
+		query = query.Where("state_code = ?", *r.State)
 	}
 
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating school rows: %w", err)
+	_, err := query.OrderBy("id").Load(&schools)
+	if err != nil {
+		return nil, err
 	}
 
-	response := &GetSchoolsResponse{
-		Schools: schools,
-		Count:   len(schools),
+	// Convert []School to []IModel
+	result := make([]IModel, len(schools))
+	for i := range schools {
+		result[i] = &schools[i]
 	}
 
-	return response, nil
+	return result, nil
+}
 
+// GetCursors calculates pagination cursors
+func (r *SchoolReader) GetCursors(db *dbr.Tx, id int, pageSize int, next bool) (Cursors, error) {
+	// Implementation depends on your pagination strategy
+	// This is a placeholder
+	return Cursors{}, fmt.Errorf("not implemented")
+}
+
+// QueryPage retrieves a paginated set of schools
+func (r *SchoolReader) QueryPage(db *dbr.Tx, cursors Cursors, pageSize int) (PaginatedResponse, error) {
+	// Implementation depends on your pagination strategy
+	// This is a placeholder
+	return PaginatedResponse{}, fmt.Errorf("not implemented")
 }

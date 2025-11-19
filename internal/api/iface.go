@@ -8,14 +8,14 @@ import (
 
 type IService interface {
 	HealthCheck(reqBody io.ReadCloser) (map[string]any, error)
-	GetSchools(req model.GetSchoolsRequest) (*model.GetSchoolsResponse, error)
-	GetStats(req model.GetStatsRequest) (*model.GetStatsResponse, error)
+	GetSchools(reader *model.SchoolReader) ([]model.School, error)
+	CreateSchool(school *model.School) error
 }
 
 type IController interface {
 	HandleHealthCheck(w http.ResponseWriter, r *http.Request)
 	HandleGetSchools(w http.ResponseWriter, r *http.Request)
-	HandleGetStats(w http.ResponseWriter, r *http.Request)
+	HandleCreateSchool(w http.ResponseWriter, r *http.Request)
 }
 
 type IRouter interface {

@@ -1,23 +1,10 @@
-package api
+package handler
 
 import (
-	"academic-api/internal/middleware"
 	"net/http"
 
 	"github.com/gorilla/mux"
 )
-
-type Router struct {
-	contoller IController
-	auth      middleware.IAuthMiddleware
-}
-
-func NewRouter(contoller IController, auth middleware.IAuthMiddleware) *Router {
-	return &Router{
-		contoller: contoller,
-		auth:      auth,
-	}
-}
 
 func (r *Router) GetRouteHandler() (http.Handler, error) {
 	router := mux.NewRouter().StrictSlash(true)

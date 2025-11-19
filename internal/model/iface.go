@@ -1,25 +1,36 @@
 package model
 
-import "database/sql"
+import (
+	"database/sql"
 
-type IResult interface{}
+	"github.com/gocraft/dbr/v2"
+)
 
 type Cursors struct {
 	Prev int
 	Next int
 }
 
-type PaginatedResult struct {
-	cursors Cursors
+type Model struct {
+	Id        int          `db:"id"`
+	CreatedAt sql.NullTime `db:"created_at"`
+	UpdatedAt sql.NullTime `db:"updated_at"`
 }
 
-type IRequest interface {
-	// Validate incoming request fields
+type IModel interface {
+	Create(db *dbr.Tx) error
 	Validate() error
+}
 
-	// Perform DB query
-	Query(db *sql.DB) (IResult, error)
-	
-	// Perform DB query with cursor pagination
-	PaginatedQuery(db *sql.DB, cursor)
+type PaginatedResponse struct {
+	models   []IModel
+	cursors  Cursors
+	pageSize int
+}
+
+type IModelReader interface {
+	Validate() error
+	GetCursors(db *dbr.Tx, id int, pageSize int, next bool) (Cursors, error)
+	Query(db *dbr.Tx) ([]IModel, error)
+	QueryPage(db *dbr.Tx, cursors Cursors, pageSize int) (PaginatedResponse, error)
 }

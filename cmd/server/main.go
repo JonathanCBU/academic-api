@@ -4,7 +4,6 @@ import (
 	"academic-api/internal/api"
 	"academic-api/internal/middleware"
 	"context"
-	"database/sql"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gocraft/dbr/v2"
 	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/sirupsen/logrus"
@@ -47,15 +47,18 @@ func main() {
 
 	// Connect to DB
 	dbPath := getEnv("DB_PATH", "./data/academic_data.db")
-	db, err := sql.Open("sqlite3", dbPath)
+	dbConn, err := dbr.Open("sqlite3", dbPath, nil)
 	if err != nil {
-		logrus.WithError(err).Fatal("Failed to open database")
+		logrus.WithError(err).Fatal("Failed to conect to database.")
 	}
-	defer db.Close()
+	defer dbConn.Close()
+
+	// TODO: introduce logging for SQL ops here
+	dbSess := dbConn.NewSession(nil)
 
 	// Initialize dependencies
 	httpClient := createHTTPClient()
-	service := api.NewService(httpClient, db)
+	service := api.NewService(httpClient, *dbSess)
 	controller := api.NewController(service)
 	jwtMiddleware := middleware.NewJwtMiddleware(middleware.AuthHeaderName, middleware.BearerPrefix)
 

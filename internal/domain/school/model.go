@@ -1,0 +1,91 @@
+package school
+
+import (
+	"academic-api/internal/domain"
+	"fmt"
+	"time"
+
+	"github.com/gocraft/dbr/v2"
+)
+
+type School struct {
+	domain.Model
+	SchoolName   string
+	StateCode    string
+	DistrictName string
+}
+
+func NewSchool(name string, state string, district string) *School {
+	return &School{
+		SchoolName:   name,
+		StateCode:    state,
+		DistrictName: district,
+	}
+}
+
+func (s *School) ValidateCreate() error {
+	if s.SchoolName == "" {
+		return fmt.Errorf("Invalid school name.")
+	}
+	if len(s.StateCode) != 2 {
+		return fmt.Errorf("Invalid state code.")
+	}
+	return nil
+}
+
+func (s *School) ValidateUpdate() error {
+	err := s.ValidateCreate()
+	if err != nil {
+		return err
+	}
+
+	// TODO: Prevent update for invalid timestamps or attempts to update deleted records
+	return nil
+}
+
+func (s *School) Create(db dbr.Tx) error {
+	err := s.ValidateCreate()
+	if err != nil {
+		return err
+	}
+	err = db.InsertInto("schools").
+		Columns("school_name", "state_code", "district_name", "created_at").
+		Record(s).
+		Returning("id", "created_at").
+		Load(s) // Load the ID and created_at back into the struct
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func (s *School) Update(db dbr.Tx) error {
+	err := s.ValidateUpdate()
+	if err != nil {
+		return err
+	}
+
+	err = db.Update("schools").
+		Set("school_name", s.SchoolName).
+		Set("state_code", s.StateCode).
+		Set("district_name", s.DistrictName).
+		Set("updated_at", time.Now()).
+		Where("id = ?", s.Id).
+		Returning("updated_at").
+		Load(s)
+
+	return err
+}
+
+func (s *School) Delete(db dbr.Tx) error {
+	err := db.Update("schools").
+		Set("is_deleted", true).
+		Set("deleted_at", time.Now()).
+		Returning("is_deleted", "deleted_at").
+		Load(s)
+
+	return err
+}
