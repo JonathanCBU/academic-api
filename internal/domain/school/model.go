@@ -2,17 +2,19 @@ package school
 
 import (
 	"academic-api/internal/domain"
+	"database/sql"
 	"fmt"
 	"time"
 
 	"github.com/gocraft/dbr/v2"
+	"github.com/sirupsen/logrus"
 )
 
 type School struct {
 	domain.Model
-	SchoolName   string
-	StateCode    string
-	DistrictName string
+	SchoolName   string `json:"school_name"`
+	StateCode    string `json:"state_code"`
+	DistrictName string `json:"district_name"`
 }
 
 func NewSchool(name string, state string, district string) *School {
@@ -43,18 +45,26 @@ func (s *School) ValidateUpdate() error {
 	return nil
 }
 
-func (s *School) Create(db dbr.Tx) error {
+func (s *School) Create(db *dbr.Tx) error {
 	err := s.ValidateCreate()
 	if err != nil {
+		logrus.WithError(err).Error("Failed to validate school content for create.")
 		return err
 	}
+
+	// Set timestamps
+	now := time.Now()
+	s.CreatedAt = sql.NullTime{Time: now, Valid: true}
+	s.UpdatedAt = sql.NullTime{Time: now, Valid: true}
+
 	err = db.InsertInto("schools").
-		Columns("school_name", "state_code", "district_name", "created_at").
+		Columns("school_name", "state_code", "district_name", "created_at", "updated_at").
 		Record(s).
-		Returning("id", "created_at").
+		Returning("id", "created_at", "updated_at").
 		Load(s) // Load the ID and created_at back into the struct
 
 	if err != nil {
+		logrus.WithError(err).Error("Failed to insert school to database.")
 		return err
 	}
 
@@ -62,7 +72,7 @@ func (s *School) Create(db dbr.Tx) error {
 
 }
 
-func (s *School) Update(db dbr.Tx) error {
+func (s *School) Update(db *dbr.Tx) error {
 	err := s.ValidateUpdate()
 	if err != nil {
 		return err
@@ -80,7 +90,7 @@ func (s *School) Update(db dbr.Tx) error {
 	return err
 }
 
-func (s *School) Delete(db dbr.Tx) error {
+func (s *School) Delete(db *dbr.Tx) error {
 	err := db.Update("schools").
 		Set("is_deleted", true).
 		Set("deleted_at", time.Now()).

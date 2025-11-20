@@ -42,8 +42,10 @@ CREATE TABLE schools (
     school_name TEXT NOT NULL,
     state_code TEXT NOT NULL,
     district_name TEXT NOT NULL,
+    is_deleted BOOLEAN,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME
+    updated_at DATETIME,
+    deleted_at DATETIME
 );
 -- Indexes for common queries
 -- CREATE INDEX idx_schools_state ON schools(state_code);

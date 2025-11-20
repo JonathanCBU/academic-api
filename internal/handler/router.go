@@ -1,34 +1,42 @@
 package handler
 
 import (
+	"academic-api/internal/middleware"
 	"net/http"
 
 	"github.com/gorilla/mux"
 )
 
+type IRouter interface {
+	GetRouteHandler() (http.Handler, error)
+}
+
+type Router struct {
+	schoolHandler ISchoolHandler
+	auth          middleware.IAuthMiddleware
+}
+
+func NewRouter(schoolHandler ISchoolHandler, auth middleware.IAuthMiddleware) *Router {
+	return &Router{
+		schoolHandler: schoolHandler,
+		auth:          auth,
+	}
+}
+
 func (r *Router) GetRouteHandler() (http.Handler, error) {
 	router := mux.NewRouter().StrictSlash(true)
 
-	// health-check
 	router.
-		Path(healthCheckPath).
-		Name(healthCheckName).
+		Path(schoolsPath + "/put").
+		Name(schoolsPathName + "Put").
 		Methods(http.MethodPost).
-		HandlerFunc(r.contoller.HandleHealthCheck)
+		HandlerFunc(r.schoolHandler.Create)
 
-	// schoools
 	router.
-		Path(schoolsPath).
-		Name(schoolsPathName).
+		Path(schoolsPath + "/get").
+		Name(schoolsPathName + "Get").
 		Methods(http.MethodPost).
-		HandlerFunc(r.contoller.HandleGetSchools)
-
-	//stats
-	// router.
-	// 	Path(statsPath).
-	// 	Name(statsPathName).
-	// 	Methods(http.MethodPost).
-	// 	HandlerFunc(r.contoller.HandleGetStats)
+		HandlerFunc(r.schoolHandler.Query)
 
 	router.Use(r.auth.GetMiddleware())
 

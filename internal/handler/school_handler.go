@@ -1,37 +1,62 @@
 package handler
 
 import (
-	"academic-api/internal/domain/school"
-	"academic-api/internal/dto"
-	"encoding/json"
+	"academic-api/internal/common"
+	"academic-api/internal/service"
+	"fmt"
 	"net/http"
 )
 
 type ISchoolHandler interface {
-	IDbController
+	Create(w http.ResponseWriter, r *http.Request)
+	Query(w http.ResponseWriter, r *http.Request)
 }
 
 type SchoolHandler struct {
-	service *school.Service
+	ISchoolHandler
+	service service.ISchoolService
 }
 
-func NewSchoolHandler(service *school.Service) *SchoolHandler {
+func NewSchoolHandler(service service.ISchoolService) *SchoolHandler {
 	return &SchoolHandler{service: service}
 }
 
 func (h *SchoolHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var req dto.CreateSchoolRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, err)
+	if r.Body == nil {
+		common.WriteBadRequestResponse(w, fmt.Errorf("No body for creating school object present."))
 		return
 	}
 
-	school := req.ToDomain() // Convert DTO to domain model
-
-	if err := h.service.CreateSchool(r.Context(), school); err != nil {
-		writeError(w, http.StatusInternalServerError, err)
+	schoolObj, err := h.service.Create(r.Body)
+	if err != nil {
+		common.WriteInternalErrorResponse(w, fmt.Errorf("Failed to create new school object: %d", err))
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, dto.FromSchool(school))
+	respBody := common.ResponseBody{
+		Message: "School object created.",
+		Data:    schoolObj,
+	}
+
+	common.WriteCreatedResponse(w, respBody)
+}
+
+func (h *SchoolHandler) Query(w http.ResponseWriter, r *http.Request) {
+	if r.Body == nil {
+		common.WriteBadRequestResponse(w, fmt.Errorf("No body for querying school object present."))
+		return
+	}
+
+	schoolObj, err := h.service.Query(r.Body)
+	if err != nil {
+		common.WriteNotFoundResponse(w, fmt.Errorf("Failed to find school object: %d", err))
+		return
+	}
+
+	respBody := common.ResponseBody{
+		Message: "School object found.",
+		Data:    schoolObj,
+	}
+
+	common.WriteOkResponse(w, respBody)
 }

@@ -14,20 +14,20 @@ type IModel interface {
 	ValidateUpdate() error
 
 	// Creates a new database record from model
-	Create(dbr.Tx) error
+	Create(db *dbr.Tx) error
 
 	// Updates database record with corresponding model primary key
-	Update(dbr.Tx) error
+	Update(db *dbr.Tx) error
 
 	// Soft deletes records in the database
-	Delete(dbr.Tx) error
+	Delete(db *dbr.Tx) error
 }
 
 type Model struct {
 	IModel
-	Id        int
-	IsDeleted bool
-	CreatedAt *sql.NullTime
-	UpdatedAt *sql.NullTime
-	DeletedAt *sql.NullTime
+	Id        int          `json:"id"`
+	IsDeleted sql.NullBool `json:"is_deleted"`
+	CreatedAt sql.NullTime `json:"created_at"`
+	UpdatedAt sql.NullTime `json:"updated_at"`
+	DeletedAt sql.NullTime `json:"deleted_at"`
 }
