@@ -5,48 +5,59 @@ import (
 	"fmt"
 
 	"github.com/gocraft/dbr/v2"
-	"github.com/sirupsen/logrus"
 )
 
-type SchoolReader struct {
-	domain.Reader
-	State string `json:"state"`
+type SchoolRequest struct {
+	domain.Request
+	StateCode    *string `json:"state_code"`
+	DistrictName *string `json:"district_name"`
 }
 
-func NewSchoolReader(cursors domain.CursorSet, pageSize int, state string) *SchoolReader {
-	return &SchoolReader{
-		Reader: domain.Reader{
-			Cursors:  cursors,
-			PageSize: pageSize,
-		},
-		State: state,
-	}
+type SchoolResponse struct {
+	domain.ApiResponse
+	Data []*School
 }
 
-func (r *SchoolReader) Validate() error {
-	if r.State != "" && len(r.State) != 2 {
+func (r *SchoolRequest) ValidateFilter() error {
+	if r.StateCode != nil && len(*r.StateCode) != 2 {
 		return fmt.Errorf("State code not valid.")
 	}
+
 	return nil
 }
 
-func (r *SchoolReader) Query(db *dbr.Tx) (*School, error) {
-	err := r.Validate()
-	if err != nil {
-		return nil, err
+func (r *SchoolRequest) ApplyFilters(query *dbr.SelectStmt) *dbr.SelectStmt {
+	if r.Id != nil {
+		query = query.Where("id = ?", *r.Id)
 	}
 
-	// TODO: implement filtering by state
-
-	school := &School{}
-	err = db.Select("*").
-		From("schools").
-		Where("id = ?", r.Id).
-		LoadOne(school)
-	if err != nil {
-		logrus.WithError(err).Error("Failed to query schools table.")
-		return nil, err
+	if r.StateCode != nil {
+		query = query.Where("state_code = ?", *r.StateCode)
 	}
 
-	return school, nil
+	if r.DistrictName != nil {
+		query = query.Where("district_name = ?", *r.DistrictName)
+	}
+
+	return query
+}
+
+func (r *SchoolRequest) ApplyCursors(query *dbr.SelectStmt, response *SchoolResponse) (*dbr.SelectStmt, *SchoolResponse) {
+	return domain.ApplyCursors(&r.Request, query, response, func(resp *SchoolResponse) *domain.ApiResponse {
+		return &resp.ApiResponse
+	})
+}
+
+func (r *SchoolRequest) Query(db *dbr.Tx) (*SchoolResponse, error) {
+	return domain.Query(
+		r,
+		db,
+		"school",
+		func() *SchoolResponse { return &SchoolResponse{} },
+		func(req *SchoolRequest) *domain.Request { return &req.Request },
+		func(resp *SchoolResponse) *domain.ApiResponse { return &resp.ApiResponse },
+		func(resp *SchoolResponse) interface{} { return &resp.Data },
+		r.ValidateFilter,
+		r.ApplyFilters,
+	)
 }

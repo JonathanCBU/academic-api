@@ -1,8 +1,6 @@
 package domain
 
 import (
-	"database/sql"
-
 	"github.com/gocraft/dbr/v2"
 )
 
@@ -24,10 +22,10 @@ type IModel interface {
 }
 
 type Model struct {
-	IModel
-	Id        int          `json:"id"`
-	IsDeleted sql.NullBool `json:"is_deleted"`
-	CreatedAt sql.NullTime `json:"created_at"`
-	UpdatedAt sql.NullTime `json:"updated_at"`
-	DeletedAt sql.NullTime `json:"deleted_at"`
+	IModel    `json:"-"`
+	Id        int      `json:"id"`
+	IsDeleted NullBool `json:"is_deleted"`
+	CreatedAt NullTime `json:"created_at"`
+	UpdatedAt NullTime `json:"updated_at"`
+	DeletedAt NullTime `json:"deleted_at"`
 }

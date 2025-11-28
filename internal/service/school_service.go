@@ -10,8 +10,10 @@ import (
 )
 
 type ISchoolService interface {
+	initRequest(reqBody io.ReadCloser) (*school.SchoolRequest, *dbr.Tx, error)
+	initWriter(reqBody io.ReadCloser) (*school.School, *dbr.Tx, error)
 	Create(reqBody io.ReadCloser) (*school.School, error)
-	Query(reqBody io.ReadCloser) (*school.School, error)
+	Query(reqBody io.ReadCloser) (*school.SchoolResponse, error)
 }
 
 type SchoolService struct {
@@ -25,48 +27,79 @@ func NewSchoolService(session *dbr.Session) *SchoolService {
 	}
 }
 
-func (s *SchoolService) Create(reqBody io.ReadCloser) (*school.School, error) {
-	schoolObj := &school.School{}
-	err := json.NewDecoder(reqBody).Decode(schoolObj)
+func (s *SchoolService) initRequest(reqBody io.ReadCloser) (*school.SchoolRequest, *dbr.Tx, error) {
+	reader := &school.SchoolRequest{}
+	err := json.NewDecoder(reqBody).Decode(reader)
 	if err != nil {
 		logrus.WithError(err).Error("Failed to decode request body.")
-		return nil, err
+		return nil, nil, err
 	}
 
 	tx, err := s.DbSession.Begin()
 	if err != nil {
 		logrus.WithError(err).Error("Failed to create database transaction.")
+		return nil, nil, err
+	}
+
+	return reader, tx, nil
+}
+
+func (s *SchoolService) initWriter(reqBody io.ReadCloser) (*school.School, *dbr.Tx, error) {
+	schoolObj := &school.School{}
+	err := json.NewDecoder(reqBody).Decode(schoolObj)
+	if err != nil {
+		logrus.WithError(err).Error("Failed to decode request body.")
+		return nil, nil, err
+	}
+
+	tx, err := s.DbSession.Begin()
+	if err != nil {
+		logrus.WithError(err).Error("Failed to create database transaction.")
+		return nil, nil, err
+	}
+
+	return schoolObj, tx, nil
+
+}
+
+func (s *SchoolService) Create(reqBody io.ReadCloser) (*school.School, error) {
+	schoolObj, tx, err := s.initWriter(reqBody)
+	if err != nil {
 		return nil, err
 	}
+	defer tx.RollbackUnlessCommitted()
 
 	err = schoolObj.Create(tx)
 	if err != nil {
 		return nil, err
 	}
-	tx.Commit()
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
 
 	return schoolObj, err
 }
 
-func (s *SchoolService) Query(reqBody io.ReadCloser) (*school.School, error) {
-	reader := &school.SchoolReader{}
-	err := json.NewDecoder(reqBody).Decode(reader)
+func (s *SchoolService) Query(reqBody io.ReadCloser) (*school.SchoolResponse, error) {
+	reader, tx, err := s.initRequest(reqBody)
 	if err != nil {
-		logrus.WithError(err).Error("Failed to decode request body.")
+		logrus.WithError(err).Error("Failed to initialize read transaction.")
 		return nil, err
 	}
+	defer tx.RollbackUnlessCommitted()
 
-	tx, err := s.DbSession.Begin()
-	if err != nil {
-		logrus.WithError(err).Error("Failed to create database transaction.")
-		return nil, err
-	}
-
-	schoolObj, err := reader.Query(tx)
+	schools, err := reader.Query(tx)
 	if err != nil {
 		logrus.WithError(err).Error("Failed to query schools table.")
 		return nil, err
 	}
 
-	return schoolObj, nil
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	return schools, nil
 }

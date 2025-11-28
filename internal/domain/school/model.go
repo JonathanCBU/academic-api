@@ -54,11 +54,18 @@ func (s *School) Create(db *dbr.Tx) error {
 
 	// Set timestamps
 	now := time.Now()
-	s.CreatedAt = sql.NullTime{Time: now, Valid: true}
-	s.UpdatedAt = sql.NullTime{Time: now, Valid: true}
+	s.CreatedAt = domain.NullTime{
+		NullTime: sql.NullTime{Time: now, Valid: true},
+	}
+	s.UpdatedAt = domain.NullTime{
+		NullTime: sql.NullTime{Time: now, Valid: true},
+	}
+	s.IsDeleted = domain.NullBool{
+		NullBool: sql.NullBool{Bool: false, Valid: true},
+	}
 
-	err = db.InsertInto("schools").
-		Columns("school_name", "state_code", "district_name", "created_at", "updated_at").
+	err = db.InsertInto("school").
+		Columns("school_name", "state_code", "district_name", "created_at", "updated_at", "is_deleted").
 		Record(s).
 		Returning("id", "created_at", "updated_at").
 		Load(s) // Load the ID and created_at back into the struct
@@ -78,7 +85,7 @@ func (s *School) Update(db *dbr.Tx) error {
 		return err
 	}
 
-	err = db.Update("schools").
+	err = db.Update("school").
 		Set("school_name", s.SchoolName).
 		Set("state_code", s.StateCode).
 		Set("district_name", s.DistrictName).
@@ -91,7 +98,7 @@ func (s *School) Update(db *dbr.Tx) error {
 }
 
 func (s *School) Delete(db *dbr.Tx) error {
-	err := db.Update("schools").
+	err := db.Update("school").
 		Set("is_deleted", true).
 		Set("deleted_at", time.Now()).
 		Returning("is_deleted", "deleted_at").

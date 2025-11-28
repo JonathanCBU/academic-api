@@ -47,7 +47,7 @@ func (h *SchoolHandler) Query(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	schoolObj, err := h.service.Query(r.Body)
+	schools, err := h.service.Query(r.Body)
 	if err != nil {
 		common.WriteNotFoundResponse(w, fmt.Errorf("Failed to find school object: %d", err))
 		return
@@ -55,7 +55,7 @@ func (h *SchoolHandler) Query(w http.ResponseWriter, r *http.Request) {
 
 	respBody := common.ResponseBody{
 		Message: "School object found.",
-		Data:    schoolObj,
+		Data:    schools,
 	}
 
 	common.WriteOkResponse(w, respBody)

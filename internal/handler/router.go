@@ -12,14 +12,16 @@ type IRouter interface {
 }
 
 type Router struct {
-	schoolHandler ISchoolHandler
-	auth          middleware.IAuthMiddleware
+	schoolHandler       ISchoolHandler
+	schoolReportHandler ISchoolReportHandler
+	auth                middleware.IAuthMiddleware
 }
 
-func NewRouter(schoolHandler ISchoolHandler, auth middleware.IAuthMiddleware) *Router {
+func NewRouter(schoolHandler ISchoolHandler, schoolReportHandler ISchoolReportHandler, auth middleware.IAuthMiddleware) *Router {
 	return &Router{
-		schoolHandler: schoolHandler,
-		auth:          auth,
+		schoolHandler:       schoolHandler,
+		schoolReportHandler: schoolReportHandler,
+		auth:                auth,
 	}
 }
 
@@ -37,6 +39,18 @@ func (r *Router) GetRouteHandler() (http.Handler, error) {
 		Name(schoolsPathName + "Get").
 		Methods(http.MethodPost).
 		HandlerFunc(r.schoolHandler.Query)
+
+	router.
+		Path(schoolReportsPath + "/put").
+		Name(schoolReportsPathName + "Put").
+		Methods(http.MethodPost).
+		HandlerFunc(r.schoolReportHandler.Create)
+
+	router.
+		Path(schoolReportsPath + "/get").
+		Name(schoolReportsPathName + "Get").
+		Methods(http.MethodPost).
+		HandlerFunc(r.schoolReportHandler.Query)
 
 	router.Use(r.auth.GetMiddleware())
 

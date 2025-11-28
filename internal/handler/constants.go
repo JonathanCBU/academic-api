@@ -1,9 +1,8 @@
 package handler
 
 const (
-	healthCheckName = "healthCheck"
-	healthCheckPath = "/health-check"
-
-	schoolsPath     = "/schools"
-	schoolsPathName = "schools"
+	schoolsPath           = "/schools"
+	schoolsPathName       = "schools"
+	schoolReportsPath     = "/school-reports"
+	schoolReportsPathName = "schoolReports"
 )

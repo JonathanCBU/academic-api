@@ -84,11 +84,15 @@ func main() {
 	schoolService := service.NewSchoolService(dbSess)
 	schoolHander := handler.NewSchoolHandler(schoolService)
 
+	// Init school report service and handler
+	schoolReportService := service.NewSchoolReportService(dbSess)
+	schoolReportHandler := handler.NewSchoolReportHandler(schoolReportService)
+
 	// Init auth middleware
 	jwtMiddleware := middleware.NewJwtMiddleware(middleware.AuthHeaderName, middleware.BearerPrefix)
 
 	// Init router
-	router := handler.NewRouter(schoolHander, jwtMiddleware)
+	router := handler.NewRouter(schoolHander, schoolReportHandler, jwtMiddleware)
 	routeHandler, err := router.GetRouteHandler()
 	if err != nil {
 		log.WithError(err).Fatal("Failed to create router.")
@@ -107,8 +111,6 @@ func main() {
 	serverErrors := make(chan error, 1)
 	go func() {
 		log.Infof("Server listening on port %s", port)
-		log.Infof("Health check available at http://localhost:%s/health-check", port)
-
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			serverErrors <- fmt.Errorf("server failed to start: %w", err)
 		}
