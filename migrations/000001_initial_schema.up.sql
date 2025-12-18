@@ -4,79 +4,67 @@
 -- ============================================================================
 -- DROP EXISTING TABLES (for clean reinstall)
 -- ============================================================================
-DROP TABLE IF EXISTS data_collection_log;
-DROP TABLE IF EXISTS district_state_benchmarks;
-DROP TABLE IF EXISTS proficiency_data;
-DROP TABLE IF EXISTS schools;
-DROP TABLE IF EXISTS states;
--- ============================================================================
--- STATES TABLE
--- ============================================================================
-CREATE TABLE states (
-    state_code TEXT PRIMARY KEY CHECK(length(state_code) = 2),
-    state_name TEXT NOT NULL,
-    data_portal_url TEXT,
-    data_portal_type TEXT CHECK (
-        data_portal_type IN (
-            'csv_download',
-            'web_portal',
-            'api',
-            'hybrid',
-            'other'
-        )
-    ),
-    data_notes TEXT,
-    latest_data_year INTEGER,
-    data_available INTEGER DEFAULT 0 CHECK(data_available IN (0, 1)),
-    last_checked_at TEXT,
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
-);
--- Index for common queries
-CREATE INDEX idx_states_data_available ON states(data_available);
+DROP TABLE IF EXISTS raw_data;
+DROP TABLE IF EXISTS school_report;
+DROP TABLE IF EXISTS school;
 -- ============================================================================
 -- SCHOOLS TABLE
 -- ============================================================================
-CREATE TABLE schools (
-    school_id INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE school (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     school_name TEXT NOT NULL,
     state_code TEXT NOT NULL,
     district_name TEXT NOT NULL,
-    nces_id TEXT,
-    address TEXT,
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (state_code) REFERENCES states(state_code) ON DELETE CASCADE
+    is_deleted BOOLEAN,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME,
+    deleted_at DATETIME
 );
--- Indexes for common queries
-CREATE INDEX idx_schools_state ON schools(state_code);
-CREATE INDEX idx_schools_district ON schools(district_name);
-CREATE INDEX idx_schools_name ON schools(school_name);
-CREATE UNIQUE INDEX idx_schools_nces ON schools(nces_id)
-WHERE nces_id IS NOT NULL;
 -- ============================================================================
--- PROFICIENCY DATA TABLE (Main Fact Table)
+-- RAW DATA TABLE
 -- ============================================================================
-CREATE TABLE proficiency_data (
-    data_id INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE raw_data (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope TEXT NOT NULL CHECK (
+        scope IN (
+            'school',
+            'district',
+            'state'
+        )
+    ),
+    source TEXT NOT NULL,
+    structure TEXT NOT NULL CHECK (
+        structure in (
+            'json',
+            'csv',
+            'xml',
+            'html',
+            'xlsx',
+            'xls'
+        )
+    ),
+    actual TEXT NOT NULL,
+    is_deleted BOOLEAN,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME,
+    deleted_at DATETIME
+);
+-- ============================================================================
+-- SINGLE SCHOOL DATA TABLE (Main Fact Table)
+-- ============================================================================
+CREATE TABLE school_report (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     school_id INTEGER NOT NULL,
+    data_id INTEGER NOT NULL,
     academic_year INTEGER NOT NULL,
     subject TEXT NOT NULL CHECK (subject IN ('ela', 'math')),
     grade_level TEXT NOT NULL,
-    -- '3-8' for aggregated, or '3', '4', etc. for individual
     demographic_group TEXT NOT NULL CHECK (
         demographic_group IN (
             'all',
             'black',
             'hispanic',
-            'frl',
-            'white',
-            'asian',
-            'native',
-            'pacific',
-            'multiracial',
-            'ell',
-            'swd'
+            'economically_disadvantaged'
         )
     ),
     n_tested INTEGER CHECK (n_tested >= 0),
@@ -85,14 +73,12 @@ CREATE TABLE proficiency_data (
         pct_proficient >= 0
         AND pct_proficient <= 100
     ),
-    data_source TEXT,
-    collection_method TEXT CHECK (
-        collection_method IN ('manual', 'automated', 'semi-automated')
-    ),
-    collected_at TEXT DEFAULT (datetime('now')),
-    collected_by TEXT,
-    notes TEXT,
-    FOREIGN KEY (school_id) REFERENCES schools(school_id) ON DELETE CASCADE,
+    is_deleted BOOLEAN,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME,
+    deleted_at DATETIME,
+    FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE,
+    FOREIGN KEY (data_id) REFERENCES raw_data(id) ON DELETE CASCADE,
     -- Ensure we don't have duplicate records for same school/year/subject/grade/demographic
     UNIQUE (
         school_id,
@@ -108,213 +94,3 @@ CREATE TABLE proficiency_data (
         OR n_proficient <= n_tested
     )
 );
--- Indexes for common queries
-CREATE INDEX idx_proficiency_school ON proficiency_data(school_id);
-CREATE INDEX idx_proficiency_year ON proficiency_data(academic_year);
-CREATE INDEX idx_proficiency_subject ON proficiency_data(subject);
-CREATE INDEX idx_proficiency_demographic ON proficiency_data(demographic_group);
-CREATE INDEX idx_proficiency_school_year ON proficiency_data(school_id, academic_year);
--- ============================================================================
--- DISTRICT AND STATE BENCHMARKS TABLE
--- ============================================================================
-CREATE TABLE district_state_benchmarks (
-    benchmark_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    state_code TEXT NOT NULL,
-    district_name TEXT,
-    -- NULL for state-level data
-    academic_year INTEGER NOT NULL,
-    subject TEXT NOT NULL CHECK (subject IN ('ela', 'math')),
-    grade_level TEXT NOT NULL,
-    demographic_group TEXT NOT NULL CHECK (
-        demographic_group IN (
-            'all',
-            'black',
-            'hispanic',
-            'frl',
-            'white',
-            'asian',
-            'native',
-            'pacific',
-            'multiracial',
-            'ell',
-            'swd'
-        )
-    ),
-    pct_proficient REAL CHECK (
-        pct_proficient >= 0
-        AND pct_proficient <= 100
-    ),
-    data_source TEXT,
-    collected_at TEXT DEFAULT (datetime('now')),
-    notes TEXT,
-    FOREIGN KEY (state_code) REFERENCES states(state_code) ON DELETE CASCADE,
-    -- Ensure no duplicate benchmarks
-    UNIQUE (
-        state_code,
-        district_name,
-        academic_year,
-        subject,
-        grade_level,
-        demographic_group
-    )
-);
--- Indexes for common queries
-CREATE INDEX idx_benchmarks_state ON district_state_benchmarks(state_code);
-CREATE INDEX idx_benchmarks_district ON district_state_benchmarks(district_name);
-CREATE INDEX idx_benchmarks_year ON district_state_benchmarks(academic_year);
-CREATE INDEX idx_benchmarks_state_year ON district_state_benchmarks(state_code, academic_year);
--- ============================================================================
--- DATA COLLECTION LOG TABLE (Audit Trail)
--- ============================================================================
-CREATE TABLE data_collection_log (
-    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    school_id INTEGER,
-    state_code TEXT,
-    collection_date TEXT DEFAULT (datetime('now')),
-    status TEXT CHECK (
-        status IN (
-            'success',
-            'partial',
-            'failed',
-            'pending',
-            'skipped'
-        )
-    ),
-    records_collected INTEGER DEFAULT 0,
-    method_used TEXT,
-    errors_encountered TEXT,
-    time_spent_minutes INTEGER,
-    collected_by TEXT,
-    FOREIGN KEY (school_id) REFERENCES schools(school_id) ON DELETE CASCADE,
-    FOREIGN KEY (state_code) REFERENCES states(state_code) ON DELETE CASCADE
-);
--- Indexes for audit queries
-CREATE INDEX idx_log_date ON data_collection_log(collection_date);
-CREATE INDEX idx_log_status ON data_collection_log(status);
-CREATE INDEX idx_log_school ON data_collection_log(school_id);
-CREATE INDEX idx_log_state ON data_collection_log(state_code);
--- ============================================================================
--- VIEWS FOR COMMON QUERIES
--- ============================================================================
--- View: Latest proficiency data for each school
-CREATE VIEW v_latest_school_proficiency AS
-SELECT s.school_id,
-    s.school_name,
-    s.state_code,
-    s.district_name,
-    p.academic_year,
-    p.subject,
-    p.grade_level,
-    p.demographic_group,
-    p.n_tested,
-    p.n_proficient,
-    p.pct_proficient,
-    p.collected_at
-FROM schools s
-    INNER JOIN proficiency_data p ON s.school_id = p.school_id
-WHERE p.academic_year = (
-        SELECT MAX(academic_year)
-        FROM proficiency_data
-        WHERE school_id = s.school_id
-    );
--- View: Data collection progress summary
-CREATE VIEW v_collection_progress AS
-SELECT s.state_code,
-    st.state_name,
-    COUNT(DISTINCT sc.school_id) as total_schools,
-    COUNT(DISTINCT p.school_id) as schools_with_data,
-    MAX(p.academic_year) as latest_year,
-    ROUND(
-        CAST(COUNT(DISTINCT p.school_id) AS REAL) * 100.0 / COUNT(DISTINCT sc.school_id),
-        2
-    ) as completion_pct
-FROM states s
-    INNER JOIN states st ON s.state_code = st.state_code
-    LEFT JOIN schools sc ON s.state_code = sc.state_code
-    LEFT JOIN proficiency_data p ON sc.school_id = p.school_id
-GROUP BY s.state_code,
-    st.state_name;
--- ============================================================================
--- TRIGGERS FOR AUTO-UPDATING TIMESTAMPS
--- ============================================================================
--- Trigger for schools table
-CREATE TRIGGER update_schools_updated_at
-AFTER
-UPDATE ON schools FOR EACH ROW BEGIN
-UPDATE schools
-SET updated_at = datetime('now')
-WHERE school_id = NEW.school_id;
-END;
--- Trigger for states table
-CREATE TRIGGER update_states_updated_at
-AFTER
-UPDATE ON states FOR EACH ROW BEGIN
-UPDATE states
-SET updated_at = datetime('now')
-WHERE state_code = NEW.state_code;
-END;
--- ============================================================================
--- SAMPLE DATA INSERTS (for testing)
--- ============================================================================
--- Insert some sample states
-INSERT INTO states (
-        state_code,
-        state_name,
-        data_portal_type,
-        data_available
-    )
-VALUES ('CA', 'California', 'web_portal', 1),
-    ('TX', 'Texas', 'csv_download', 1),
-    ('NY', 'New York', 'web_portal', 1),
-    ('FL', 'Florida', 'csv_download', 0);
--- ============================================================================
--- HELPFUL QUERIES (commented out, for reference)
--- ============================================================================
-/*
- -- Query to generate the final spreadsheet output
- SELECT 
- s.school_name,
- s.state_code,
- s.district_name,
- p.demographic_group,
- MAX(CASE WHEN p.subject = 'ela' THEN p.n_tested END) as ela_n_tested,
- MAX(CASE WHEN p.subject = 'ela' THEN p.n_proficient END) as ela_n_proficient,
- MAX(CASE WHEN p.subject = 'ela' THEN p.pct_proficient END) as ela_pct,
- MAX(CASE WHEN p.subject = 'math' THEN p.n_tested END) as math_n_tested,
- MAX(CASE WHEN p.subject = 'math' THEN p.n_proficient END) as math_n_proficient,
- MAX(CASE WHEN p.subject = 'math' THEN p.pct_proficient END) as math_pct,
- MAX(CASE WHEN d.subject = 'ela' THEN d.pct_proficient END) as district_ela_pct,
- MAX(CASE WHEN d.subject = 'math' THEN d.pct_proficient END) as district_math_pct,
- MAX(CASE WHEN st.subject = 'ela' THEN st.pct_proficient END) as state_ela_pct,
- MAX(CASE WHEN st.subject = 'math' THEN st.pct_proficient END) as state_math_pct
- FROM schools s
- LEFT JOIN proficiency_data p ON s.school_id = p.school_id 
- AND p.academic_year = 2024
- AND p.grade_level = '3-8'
- LEFT JOIN district_state_benchmarks d ON s.district_name = d.district_name 
- AND s.state_code = d.state_code
- AND d.academic_year = 2024
- AND d.grade_level = '3-8'
- AND d.demographic_group = p.demographic_group
- LEFT JOIN district_state_benchmarks st ON s.state_code = st.state_code 
- AND st.district_name IS NULL
- AND st.academic_year = 2024
- AND st.grade_level = '3-8'
- AND st.demographic_group = p.demographic_group
- WHERE p.demographic_group IN ('all', 'black', 'hispanic', 'frl')
- GROUP BY s.school_id, s.school_name, s.state_code, s.district_name, p.demographic_group
- ORDER BY s.school_name, p.demographic_group;
- */
-/*
- -- Query to find schools missing data
- SELECT s.school_id, s.school_name, s.state_code
- FROM schools s
- LEFT JOIN proficiency_data p ON s.school_id = p.school_id 
- AND p.academic_year = 2024
- WHERE p.data_id IS NULL;
- */
-/*
- -- Query to check data collection status by state
- SELECT * FROM v_collection_progress
- ORDER BY completion_pct DESC;
- */
