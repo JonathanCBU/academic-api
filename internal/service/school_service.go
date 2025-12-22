@@ -1,9 +1,10 @@
 package service
 
 import (
-	"academic-api/internal/domain/school"
 	"encoding/json"
 	"io"
+
+	"academic-api/internal/domain/school"
 
 	"github.com/gocraft/dbr/v2"
 	"github.com/sirupsen/logrus"
@@ -59,7 +60,6 @@ func (s *SchoolService) initWriter(reqBody io.ReadCloser) (*school.School, *dbr.
 	}
 
 	return schoolObj, tx, nil
-
 }
 
 func (s *SchoolService) Create(reqBody io.ReadCloser) (*school.School, error) {
